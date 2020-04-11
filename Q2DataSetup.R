@@ -11,10 +11,15 @@ sub <- rep(NA, 1170)
 for (i in 1:length(indexes)){
   sub[i] <- myFasta[indexes[i]]
 }
+#names(sub) <- indexes
+df <- data.frame(ID = indexes, Seq = paste(sub), stringsAsFactors = FALSE)
+#names(df) <- c("ID", "Seq")
 
-df <- data.frame(ID = indexes, Seq = sub, stringsAsFactors = FALSE)
-names(df) <- c("ID", "Seq")
+#df2 <- df[!is.na(names(df))]
 
-df2 <- df[!is.na(names(df))]
+#sub[2]
 
-dna <- sapply(df2$Seq, strsplit, split = "")
+
+dna <- sapply(df$Seq, strsplit, split = "")
+
+#df$Seq[1:2]

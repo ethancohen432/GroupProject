@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Biological Questions
-1. What is the diversity of bacteria within the belly button samples?
+1. Do the belly button microbiome differ between the two populations from which samples were taken from?
 2. What is the evolutionary relationship between the different species found in one sample (one belly button)?
 
 # Question 1
@@ -149,6 +149,9 @@ qplot(x = NMDS1, NMDS2, colour = collection, alpha = I(0.6), data = PDat) +
   theme_bw()
 ```
 
+## Conclusion
+
+Overall, none of the trees nor does the NMDS clearly show the samples being clustered together based on their population. Therefore, based on this cluster analysis, the belly button microbriome do not differ between the two populations from which samples were taken from.  
 
 
 
