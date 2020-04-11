@@ -1,0 +1,173 @@
+---
+title: "Group Project"
+authors: "Gabrielle McCabe, Ethan Cohen, Jenna Kim, Kevin Saroya, Aimee Watts"
+date: "10/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Biological Questions
+1. What is the diversity of bacteria within the belly button samples?
+2. What is the evolutionary relationship between the different species found in one sample (one belly button)?
+
+# Question 1
+
+Libraries. 
+```{r}
+library(ggplot2)
+library(ape)
+library(ggtree)
+library(vegan)
+```
+
+## Setup Sample Information
+
+Import the sample information.
+```{r}
+Samples <- read.csv("data/sample_info.csv")
+```
+
+## Setup OTU table
+
+Import OTU table.
+```{r}
+OTU_table <- read.delim("data/OTU_file.txt", header = T, row.names = "X.OTU.ID")
+```
+
+Remove taxonomy column from OTU table.
+```{r}
+OTU_data <- OTU_table[, -c(1, ncol(OTU_table))]
+```
+
+Calculate the total sequences in the dataset.
+```{r}
+x <- rowSums(OTU_data)
+sum(x)
+```
+
+With 24,000 reads there are most likely going to be some reads that are only contamination. Therefore, to remove these and to reduce the dataset slightly we will remove any OTUs that do not have more than one sequence in more than one sample.
+```{r}
+drop <- rowSums(OTU_data) < 2
+sum(drop)  # The number of sequences being removed.
+OTU_red <- OTU_data[!drop, ]
+```
+
+Transpose the table so that the species are across the top and the samples are along the side.
+```{r}
+OTU_red[1:3, 1:3]  # Preview the layout of the original data.frame. 
+OTUs <- as.data.frame(t(OTU_red))
+OTUs[1:3, 1:3]  # Ensure transpose worked.
+```
+
+## Analysis
+### Binary Method
+
+Change OTUs data.frame into binary data by changing the read counts in each sequence to 1 or 0.
+```{r}
+OTU_bin <- OTUs
+OTU_bin[OTU_bin > 0] <- 1
+```
+
+Calculate the pairwise distance of the binary matrix.
+```{r}
+OTU_bin_dist <- dist(OTU_bin, method = "binary")
+```
+
+Build the binary neighbour-joining tree, annotate it using the sample information, and output it as a pdf.
+```{r}
+OTU_bin_tree <- nj(OTU_bin_dist)
+
+pdf(width = 16, height = 20, "Binary_Tree.pdf")
+ggtree(OTU_bin_tree, layout = "rectangular") %<+% Samples +
+  geom_tiplab(aes(colour = collection)) +
+  theme(legend.position = "right")
+dev.off()
+```
+
+### Euclidean Method
+
+Calculate the euclidean distance.
+```{r}
+OTU_euc_dist <- dist(OTUs, method = "euclidean") 
+```
+
+Build the euclidean neighbour-joining tree, annotate it using the sample information, and output it as a pdf.
+```{r}
+OTU_euc_tree <- nj(OTU_euc_dist)               
+
+pdf(width = 16, height = 20, "Euclidean_Tree.pdf")
+ggtree(OTU_euc_tree, layout = "rectangular") %<+% Samples +
+  geom_tiplab(aes(colour = collection)) +
+  theme(legend.position = "right")
+dev.off()
+```
+
+### Bray-Curtis Dissimilarity Method
+
+Calculate the Bray-Curtis dissimilarity.
+```{r}
+OTU_bc_dist <- vegdist(OTUs, method = "bray", binary = T)
+```
+
+Build the Bray-Curtis dissimilarity neighbour-joining tree, annotate it using the sample information, and output it as a pdf.
+```{r}
+OTU_bc_tree <- nj(OTU_bc_dist)
+
+pdf(width = 16, height = 20, "Bray_Curtis_Tree.pdf")
+ggtree(OTU_bc_tree, layout = "rectangular") %<+% Samples +
+  geom_tiplab(aes(colour = collection)) +
+  theme(legend.position = "right")
+dev.off()
+```
+
+### Non-Metric Multidimensional Scaling (NMDS)
+
+Perform the model.
+```{r}
+set.seed(13)
+NMDSdat <- metaMDS(OTU_bc_dist, k = 2, trymax = 100)
+```
+
+Create data for plotting.
+```{r}
+PDat <- data.frame(NMDS1 = NMDSdat$points[ , 1],
+                   NMDS2 = NMDSdat$points[ , 2],
+                   sample = row.names(OTUs))
+```
+
+Add species labels.
+```{r}
+PDat <- merge(PDat, Samples, by = "sample", all.x = T, all.y = F)
+```
+
+Plot the NMDS.
+```{r}
+qplot(x = NMDS1, NMDS2, colour = collection, alpha = I(0.6), data = PDat) +
+  theme_bw()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
