@@ -153,6 +153,7 @@ qplot(x = NMDS1, NMDS2, colour = collection, alpha = I(0.6), data = PDat) +
 
 Overall, none of the trees nor does the NMDS clearly show the samples being clustered together based on their population. Therefore, based on this cluster analysis, the belly button microbriome do not differ between the two populations from which samples were taken from.  
 
+# Question 2
 
 
 
