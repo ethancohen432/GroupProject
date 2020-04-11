@@ -1,4 +1,5 @@
 library(seqinr)
+library(ape)
 
 myFasta <- read.fasta(file = "data/raw_seqs_BB.fna", seqtype = "AA", as.string = TRUE, set.attributes = FALSE)
 
@@ -18,3 +19,6 @@ names(df) <- c("ID", "Seq")
 df2 <- df[!is.na(names(df))]
 
 dna <- sapply(df2$Seq, strsplit, split = "")
+
+
+

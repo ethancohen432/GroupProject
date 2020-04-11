@@ -21,6 +21,8 @@ library(ggplot2)
 library(ape)
 library(ggtree)
 library(vegan)
+library(seqinr)
+library(reshape2)
 ```
 
 ## Setup Sample Information
@@ -149,25 +151,67 @@ qplot(x = NMDS1, NMDS2, colour = collection, alpha = I(0.6), data = PDat) +
   theme_bw()
 ```
 
+# Question 2
 
+####
+Importing the Fasta file and selecting a single sample, B1285, in order to determine the evolutionary diversity among the bacteria and archaea within that single sample.
+A for loop was utilized to gather all the sequence reads which pertained to the individual sample collected (B1285)
+```{r}
+myFasta <- read.fasta(file = "data/raw_seqs_BB.fna", seqtype = "AA", as.string = TRUE, set.attributes = FALSE)
+nam <- names(myFasta)
 
+indexes <- grep("B1285", nam)
 
+sub <- rep(NA, 1170)
 
+for (i in 1:length(indexes)){
+  sub[i] <- myFasta[indexes[i]]
+}
+```
 
+Creating a dataframe using index numbers as IDs and the sequence data from the myFasta file pasted in the seq column. A new object 'dna' was created
+using the sapply function to seperate each base pair into seperate columns. Following, the names function was utilized to re-name all row names to their corresponding indices from the orignial file read into the myFasta file.
+```{r}
+df <- data.frame(ID = as.factor(indexes), Seq = paste(sub), stringsAsFactors = FALSE)
+dna <- sapply(df$Seq, strsplit, split = "")
+names(dna) <- paste(1:nrow(df),df$ID,sep="_")
+dna_bin<-as.DNAbin(dna)
+```
 
+The 'dna' file was converted to a DNAbin object which can be acted upon the muscle to align the sequence data. Following this, we used the dist.dna function to compute a matrix of pairwise distances from DNA sequences using the k80 model of DNA evolution.
+```{r}
+dna_align <- muscle(dna_bin,quiet=F)
+```
 
+```{r}
+dnaDM<-dist.dna(dna_align, model="K80")
+dnaDMmat<-as.matrix(dnaDM)
+```
 
+Next we generated a heat-map comparing the sequence similarities, however, to do this we had to utilize the melt function to turn our 'DM' file into a linear matrix which can then be plotted as a heat map. We then used ggplot to construct the heatmap according to certain specifications. 
+```{r}
+PDat<-melt(dnaDMmat)
+dim(PDat)
+ggplot(data = PDat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+scale_fill_gradientn(colours=c("yellow","blue","green","red")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
+pdf(width=20,height=10, "HeatMap_B1285.pdf")
+ggplot(data = PDat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+scale_fill_gradientn(colours=c("yellow","blue","green","red")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+dev.off()
+```
 
+### Phylogenetic Tree Building
 
+To understand the evolutionary releationship among all 1170 samples, a phylogentic tree using the neighbour joining method was created. The distance matrix created earlier was inputted as the data. The neighbour joining method was used over the minimium evolution method becasuse each sequence read was relatively small (<300) while the number of taxa compared was high. The branch.length was specified to 'none' to better focus on the relationship among the taxa rather than the evolutionary distance among them.
+```{r}
+dnaTree<-nj(dnaDM)
+str(dnaTree)
+ggtree(dnaTree, branch.length='none')
 
-
-
-
-
-
-
-
-
-
-
+pdf(width=20,height=10, "PhylogeneticTree_B1285")
+ggtree(dnaTree, branch.length='none')
+dev.off()
+```
