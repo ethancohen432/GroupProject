@@ -13,15 +13,16 @@ knitr::opts_chunk$set(echo = TRUE)
 1. Do the belly button microbiome differ between the two populations from which samples were taken from?
 2. What is the evolutionary relationship between the different species found in one sample (one belly button)?
 
-# Question 1
-
-Libraries. 
+# Libraries
 ```{r}
 library(ggplot2)
 library(ape)
 library(ggtree)
 library(vegan)
+library(seqinr)
+library(reshape2)
 ```
+# Question 1
 
 ## Setup Sample Information
 
@@ -79,6 +80,9 @@ OTU_bin_dist <- dist(OTU_bin, method = "binary")
 Build the binary neighbour-joining tree, annotate it using the sample information, and output it as a pdf.
 ```{r}
 OTU_bin_tree <- nj(OTU_bin_dist)
+ggtree(OTU_bin_tree, layout = "rectangular") %<+% Samples +
+  geom_tiplab(aes(colour = collection)) +
+  theme(legend.position = "right")
 
 pdf(width = 16, height = 20, "Binary_Tree.pdf")
 ggtree(OTU_bin_tree, layout = "rectangular") %<+% Samples +
@@ -97,6 +101,9 @@ OTU_euc_dist <- dist(OTUs, method = "euclidean")
 Build the euclidean neighbour-joining tree, annotate it using the sample information, and output it as a pdf.
 ```{r}
 OTU_euc_tree <- nj(OTU_euc_dist)               
+ggtree(OTU_euc_tree, layout = "rectangular") %<+% Samples +
+  geom_tiplab(aes(colour = collection)) +
+  theme(legend.position = "right")
 
 pdf(width = 16, height = 20, "Euclidean_Tree.pdf")
 ggtree(OTU_euc_tree, layout = "rectangular") %<+% Samples +
@@ -115,6 +122,9 @@ OTU_bc_dist <- vegdist(OTUs, method = "bray", binary = T)
 Build the Bray-Curtis dissimilarity neighbour-joining tree, annotate it using the sample information, and output it as a pdf.
 ```{r}
 OTU_bc_tree <- nj(OTU_bc_dist)
+ggtree(OTU_bc_tree, layout = "rectangular") %<+% Samples +
+  geom_tiplab(aes(colour = collection)) +
+  theme(legend.position = "right")
 
 pdf(width = 16, height = 20, "Bray_Curtis_Tree.pdf")
 ggtree(OTU_bc_tree, layout = "rectangular") %<+% Samples +
@@ -149,13 +159,10 @@ qplot(x = NMDS1, NMDS2, colour = collection, alpha = I(0.6), data = PDat) +
   theme_bw()
 ```
 
-## Conclusion
-
-Overall, none of the trees nor does the NMDS clearly show the samples being clustered together based on their population. Therefore, based on this cluster analysis, the belly button microbriome do not differ between the two populations from which samples were taken from.  
-
 # Question 2
 
-####
+## Data setup
+
 Importing the Fasta file and selecting a single sample, B1285, in order to determine the evolutionary diversity among the bacteria and archaea within that single sample.
 A for loop was utilized to gather all the sequence reads which pertained to the individual sample collected (B1285)
 ```{r}
@@ -180,13 +187,89 @@ names(dna) <- paste(1:nrow(df),df$ID,sep="_")
 dna_bin<-as.DNAbin(dna)
 ```
 
-The 'dna' file was converted to a DNAbin object which can be acted upon the muscle to align the sequence data. Following this, we used the dist.dna function to compute a matrix of pairwise distances from DNA sequences using the k80 model of DNA evolution.
+## Alignment
+
+The 'dna' file was converted to a DNAbin object which can be acted upon the muscle to align the sequence data. 
 ```{r}
 dna_align <- muscle(dna_bin,quiet=F)
 ```
 
+## Inspect the alignment
+
+Visual of the alignment of all sequences at all sites. There is too much going on to determine anything so we will zoom in on the beginning, middle, and end of the alignment for the first half of the sequences and then the second half.
 ```{r}
-dnaDM<-dist.dna(dna_align, model="K80")
+checkAlignment(dna_align, what = 1)
+```
+
+The beginning of the alignment for the first half of the sequences. Note the large gaps right before and after site 80.
+```{r}
+checkAlignment(dna_align[1:585, 1:150], what = 1)
+```
+
+The beginning of the alignment for the second half of the sequences. Note the large gaps right before and after site 80.
+```{r}
+checkAlignment(dna_align[586:1170, 1:150], what = 1)
+```
+
+The middle of the alignment for the first half of the sequences. Note the large gap before site 10.
+```{r}
+checkAlignment(dna_align[1:585, 151:300], what = 1)
+```
+
+The middle of the alignment for the second half of the sequences. Note the large gap before site 10.
+```{r}
+checkAlignment(dna_align[586:1170, 151:300], what = 1)
+```
+
+The end of the alignment for the first half of the sequences. Note that there does not seem to be any large gaps as in the previous alignments but there are still some smaller gaps that are visible.
+```{r}
+checkAlignment(dna_align[1:585, 301:422], what = 1)
+```
+
+The end of the alignment for the second half of the sequences. Note that there does not seem to be any large gaps as in the previous alignments but there are still some smaller gaps that are visible.
+```{r}
+checkAlignment(dna_align[586:1170, 301:422], what = 1)
+```
+
+The distribution of gap lengths. Note that there are over 8000 gaps of length 1.
+```{r}
+checkAlignment(dna_align, what = 2)
+```
+
+The shannon index (H) for each sequence position.
+```{r}
+checkAlignment(dna_align, what = 3)
+```
+
+The number of observed bases for each sequence position. Note that all positions have 1.0 base and most positions have 2.0 bases.
+```{r}
+checkAlignment(dna_align, what = 4)
+```
+
+We are going to remove the sequences with too many gaps. First we will visualize the gaps.
+```{r}
+seqLen <- as.numeric(lapply(dna_bin, length))
+qplot(seqLen) +
+  theme_bw()
+```
+
+From the graph above, we will use 290 as a cutoff and then visualize the alignment without those gaps.
+```{r}
+keepSeq <- seqLen > 290
+dna_subset <- dna_align[keepSeq, ]
+checkAlignment(dna_subset, what = 1)
+```
+
+Now we will redo the alignment without the sequences with the large gaps.
+```{r}
+dna_sub_align <- muscle(dna_subset, quiet = F)
+```
+
+## Analyze
+
+We used the dist.dna function to compute a matrix of pairwise distances from DNA sequences using the k80 model of DNA evolution.
+```{r}
+dnaDM<-dist.dna(dna_sub_align, model="K80")
 dnaDMmat<-as.matrix(dnaDM)
 ```
 
@@ -205,9 +288,9 @@ ggplot(data = PDat, aes(x=Var1, y=Var2, fill=value)) +
 dev.off()
 ```
 
-### Phylogenetic Tree Building
+## Phylogenetic Tree Building
 
-To understand the evolutionary releationship among all 1170 samples, a phylogentic tree using the neighbour joining method was created. The distance matrix created earlier was inputted as the data. The neighbour joining method was used over the minimium evolution method becasuse each sequence read was relatively small (<300) while the number of taxa compared was high. The branch.length was specified to 'none' to better focus on the relationship among the taxa rather than the evolutionary distance among them.
+To understand the evolutionary releationship among all 1170 samples, a phylogentic tree using the neighbour joining method was created. The distance matrix created earlier was inputted as the data. The neighbour joining method was used over the minimium evolution method becasuse each sequence read was relatively small (<300) while the number of taxa compared was high. The branch length was specified to 'none' to better focus on the relationship among the taxa rather than the evolutionary distance among them. We decided not to include tip labels because we are interested in the overall evolutionary relationship not the relationships between individual sequences. In addtion, not including the tip labels makes the tree more readable.
 ```{r}
 dnaTree<-nj(dnaDM)
 str(dnaTree)
@@ -217,6 +300,7 @@ pdf(width=20,height=10, "PhylogeneticTree_B1285")
 ggtree(dnaTree, branch.length='none')
 dev.off()
 ```
+
 
 
 
